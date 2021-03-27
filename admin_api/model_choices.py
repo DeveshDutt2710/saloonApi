@@ -1,0 +1,17 @@
+PROFILE_TYPE_VENDOR = "vendor"
+PROFILE_TYPE_CUSTOMER = 'customer'
+PROFILE_TYPE_ADMIN = 'admin'
+
+PROFILE_TYPE = (
+    (PROFILE_TYPE_VENDOR, "vendor"),
+    (PROFILE_TYPE_CUSTOMER, "customer"),
+    (PROFILE_TYPE_ADMIN, "admin")
+)
+
+PRODUCT_TYPE_PRODUCT = "product"
+PRODUCT_TYPE_SERVICE = 'service'
+
+PRODUCT_TYPES = (
+    (PRODUCT_TYPE_PRODUCT, "Product"),
+    (PRODUCT_TYPE_SERVICE, "Service")
+)
