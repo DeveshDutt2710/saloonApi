@@ -1,110 +1,121 @@
-import json
-from bson import json_util
-from collections import OrderedDict  # don't remove this import
-from rest_framework import serializers
-from djongo import models
-from ..model_choices import *
-from utility.exception_utilities import *
-from utility.time_utilities import TimeUtilities
+from utility.pagination_utilities import PaginationUtilities
+from .serializers import ProfileSerializer
+from ..serializers import BsonSerializer
+from .models import Profiles
 from djongo.models.fields import ObjectId
 from datetime import datetime
 
 
-class Profiles(models.Model):
-    objects = models.DjongoManager()
 
-    _id = models.ObjectIdField(primary_key=True)
-    name = models.CharField(max_length=255, null=False)
-    profileType = models.CharField(choices=PROFILE_TYPE, max_length=1024, default=PROFILE_TYPE_CUSTOMER)
+class ProfileService():
+    profile_id = None
+    page = 1
+    page_size = 10
 
-    vendorDescription = models.TextField(null=True)
-    contact = models.JSONField()
+    def __init__(self, profile_id: str = None, page: int = 1, page_size: int = 10):
+        self.set_profile_id(profile_id)
+        self.page = page
+        self.page_size = page_size
 
-    address = models.JSONField()
+    def set_profile_id(self, profile_id):
+        self.profile_id = profile_id
+
+    def get_profile_id(self):
+        return self.profile_id
+
+    def _replace_id_to_object_ids_for_user_coupons(self, userCoupons):
+        for coupon in userCoupons:
+            coupon['_id'] = ObjectId(coupon['_id'])
+
+    def fetch_all_profiles(self) -> dict:
+        profiles = Profiles.objects.all()  # .filter(is_deleted=False)
+
+        profiles = PaginationUtilities.paginate_results(profiles,
+                                                        page_number=self.page,
+                                                        page_size=self.page_size)
+
+        profile_data = ProfileSerializer(profiles, many=True)
+
+        response = {
+            'success': True,
+            'profiles': profile_data.data
+        }
+
+        return response
+
+    def fetch_profile_by_id(self) -> dict:
+        profiles = Profiles.get_object_or_raise_exception(self.get_profile_id())
+
+        profile_data = ProfileSerializer(profiles)
+
+        response = {
+            'success': True,
+            'profile': profile_data.data
+        }
+
+        return response
+
+    def create_profile(self, data) -> dict:
+        #my_coupons = data.pop('myCoupons') if 'myCoupons' in data else []
+        #self._replace_id_to_object_ids_for_user_coupons(my_coupons)
+        #data['myCoupons'] = my_coupons
+
+        data = Profiles(**data).save()
+
+        response = {
+            'success': True,
+            'profile_id' : str(data)
+        }
+
+        return response
+
+    def update_profile(self, data) -> dict:
+        #my_coupons = data.pop('myCoupons') if 'myCoupons' in data else []
+        #self._replace_id_to_object_ids_for_user_coupons(my_coupons)
+        #data['myCoupons'] = my_coupons
+        print(type(data))
+        data['updatedAt'] = datetime.now()
+
+        filtered_profile = Profiles.objects.filter(pk=ObjectId(self.get_profile_id()))
+        filtered_profile.update(**data)
+
+        response = {
+            'success': True,
+            'profile_id' : str(self.get_profile_id())
+        }
 
 
-    dob = models.DateTimeField()
+        return response
 
-    gender = models.CharField(max_length=10)
-    image = models.TextField()
+    def delete_profile(self) -> dict:
+        profile = Profiles.get_object_or_raise_exception(self.get_profile_id())
 
-    lastAppActivity = models.DateTimeField(null=True)
+        profile.delete_profile()
 
-    createdAt = models.DateTimeField()
-    updatedAt = models.DateTimeField()
+        response = {
+            'success': True,
+        }
 
-    is_deleted = models.BooleanField(default=False)
-    is_admin_verified = models.BooleanField(default=False)
+        return response
 
+    def search_profile(self, query):
+        profiles = [i for i in Profiles.objects.mongo_find(
+            {'$or': [{'name': {"$regex": f'.*{query}.*', "$options": "i"}},
+                     {'contact.email': {"$regex": f'.*{query}.*', "$options": "i"}},
+                     {'contact.phone': {"$regex": f'.*{query}.*', "$options": "i"}}
+                     ]
+             }
+        )]
 
-    class Meta:
-        managed = False
-        db_table = 'profiles'
+        profiles = PaginationUtilities.paginate_results(profiles,
+                                                        page_number=self.page,
+                                                        page_size=self.page_size)
 
-    @staticmethod
-    def get_object_or_raise_exception(profile_id):
-        try:
-            return Profiles.objects.get(pk=ObjectId(profile_id))
-        except Profiles.DoesNotExist:
-            response = {
-                'success': False,
-                'detail': f'Profile with id {profile_id} does not exist'
-            }
-            raise InvalidProfileException(response, status_code=status_codes.HTTP_400_BAD_REQUEST)
+        data = BsonSerializer.serialize_search_results(profiles)
 
-    @staticmethod
-    def get_object_or_none(profile_id):
-        try:
-            return Profiles.objects.get(pk=ObjectId(profile_id))
-        except Profiles.DoesNotExist:
-            return None
+        response = {
+            'success': True,
+            'profiles': data
+        }
 
-    def delete_profile(self):
-        self.is_deleted = True
-        self.save()
-
-    def save(self, *args, **kwargs):
-
-        current_time = datetime.now()
-
-        if not self.createdAt:
-            self.createdAt = current_time
-
-        self.updatedAt = current_time
-
-        super(Profiles, self).save(*args, **kwargs)
-        return self._id
-    
-    def update(self, *args, **kwargs):
-
-        self.updatedAt = datetime.now()
-        print("TESTING")
-        super(Profiles, self).update(*args, **kwargs)
-
-
-
-class ProfileSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Profiles
-        fields = '__all__'
-
-    def to_representation(self, profile):
-        data = super(ProfileSerializer, self).to_representation(profile)
-        fields = self._readable_fields
-
-        json_fields = ['address', 'contact', 'privacySetting']
-
-        for field in fields:
-
-            if field.field_name == "myCoupons" and data[field.field_name] is not None:
-                data[field.field_name] = json.loads(data[field.field_name])
-
-            elif field.field_name in json_fields and data[field.field_name] is not None:
-                data[field.field_name] = dict(eval(data[field.field_name]))
-
-            if data[field.field_name] is None:
-                del data[field.field_name]
-
-        return data
-
+        return response

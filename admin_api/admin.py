@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .profiles.profile_service import Profiles
-from  .products.product_service import Products
+from .profiles.models import Profiles
+from  .products.models import Products
 
 
 admin.site.register(Profiles)

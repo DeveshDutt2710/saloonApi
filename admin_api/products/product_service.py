@@ -1,88 +1,103 @@
-from djongo import models
-from ..model_choices import *
-from utility.exception_utilities import *
-from utility.time_utilities import TimeUtilities
+from utility.pagination_utilities import PaginationUtilities
+from .serializers import ProductSerializer
+from .models import Products
+from ..serializers import BsonSerializer
 from djongo.models.fields import ObjectId
-from ..profiles.profile_service import Profiles
-from datetime import datetime
-import json
-from collections import OrderedDict  # don't remove this import
-from rest_framework import serializers
 
-class Products(models.Model):
-    objects = models.DjongoManager()
 
-    _id = models.ObjectIdField()
-    name = models.TextField()
-    description = models.TextField()
-    price = models.IntegerField()
+class ProductService():
 
-    sales = models.IntegerField(default=0)
-    timings = models.JSONField()
-    productAvailability = models.BooleanField(default=False)
-    rating = models.IntegerField(default=5)
+    product_id = None
+    page = 1
+    page_size = 10
 
-    productType = models.CharField(choices=PRODUCT_TYPES, max_length=1024, default=PRODUCT_TYPE_PRODUCT)
-    vendorId = models.ForeignKey(Profiles, on_delete=models.CASCADE)
+    def __init__(self, product_id: str = None, page: int = 1, page_size: int = 10):
+        self.set_product_id(product_id)
+        self.page = page
+        self.page_size = page_size
 
-    createdAt = models.DateTimeField()
-    updatedAt = models.DateTimeField()
+    def set_product_id(self, product_id):
+        self.product_id = product_id
 
-    is_deleted = models.BooleanField(default=False)
+    def get_product_id(self):
+        return self.product_id
 
-    class Meta:
-        managed = False
-        db_table = 'products'
+    def fetch_all_products(self) -> dict:
+        products = Products.objects.all()  # .filter(is_deleted=False)
 
-    @staticmethod
-    def get_object_or_raise_exception(product_id):
-        try:
-            return Products.objects.get(pk=ObjectId(product_id))
-        except Products.DoesNotExist:
-            response = {
-                'success': False,
-                'detail': f'Product with id {product_id} does not exist'
-            }
-            raise InvalidProfileException(response, status_code=status_codes.HTTP_400_BAD_REQUEST)
+        products = PaginationUtilities.paginate_results(products,
+                                                        page_number=self.page,
+                                                        page_size=self.page_size)
 
-    @staticmethod
-    def get_object_or_none(product_id):
-        try:
-            return Products.objects.get(pk=ObjectId(product_id))
-        except Products.DoesNotExist:
-            return None
+        data = ProductSerializer(products, many=True).data
 
-    def delete_product(self):
-        self.is_deleted = True
-        self.save()
+        response = {
+            'success': True,
+            'products': data
+        }
 
-    def save(self, *args, **kwargs):
+        return response
 
-        current_time = datetime.now()
+    def fetch_product_by_id(self) -> dict:
+        product = Products.get_object_or_raise_exception(self.get_product_id())
 
-        if not self.createdAt:
-            self.createdAt = current_time
+        product_data = ProductSerializer(product)
 
-        self.updatedAt = current_time
+        response = {
+            'success': True,
+            'product': product_data.data
+        }
 
-        super(Products, self).save(*args, **kwargs)
+        return response
 
-class ProductSerializer(serializers.ModelSerializer):
+    def create_product(self, data) -> dict:
 
-    class Meta:
-        model = Products
-        fields = '__all__'
+        Products(**data).save()
 
-    def to_representation(self, profile):
-        data = super(ProductSerializer, self).to_representation(profile)
-        fields = self._readable_fields
+        response = {
+            'success': True,
+        }
 
-        for field in fields:
+        return response
 
-            if field.field_name == "timings" and data[field.field_name] is not None:
-                data[field.field_name] = dict(eval(data[field.field_name]))
+    def update_product(self, data) -> dict:
 
-            if data[field.field_name] is None:
-                del data[field.field_name]
+        Products.objects.filter(pk=ObjectId(self.get_product_id())).update(**data)
 
-        return data
+        response = {
+            'success': True,
+        }
+
+        return response
+
+    def delete_product(self) -> dict:
+        product = Products.get_object_or_raise_exception(self.get_product_id())
+
+        product.delete_product()
+
+        response = {
+            'success': True,
+        }
+
+        return response
+
+    def search_product(self, query):
+
+        products = [i for i in Products.objects.mongo_find(
+            {'$or': [{'name': {"$regex": f'.*{query}.*', "$options": "i"}}
+                     ]
+             }
+        )]
+
+        products = PaginationUtilities.paginate_results(products,
+                                                        page_number=self.page,
+                                                        page_size=self.page_size)
+
+        data = BsonSerializer.serialize_search_results(products)
+
+        response = {
+            'success': True,
+            'profiles': data
+        }
+
+        return response
