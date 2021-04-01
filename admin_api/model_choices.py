@@ -15,3 +15,13 @@ PRODUCT_TYPES = (
     (PRODUCT_TYPE_PRODUCT, "Product"),
     (PRODUCT_TYPE_SERVICE, "Service")
 )
+
+ORDER_STATUS_COMPLETED = "completed"
+ORDER_STATUS_UPCOMING = 'upcoming'
+ORDER_STATUS_CANCELLED = 'cancelled'
+
+ORDER_STATUS = (
+    (ORDER_STATUS_COMPLETED, "Completed"),
+    (ORDER_STATUS_UPCOMING, "Upcoming"),
+    (ORDER_STATUS_CANCELLED, "Cancelled")
+)
