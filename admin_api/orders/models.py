@@ -4,6 +4,8 @@ from utility.exception_utilities import *
 from utility.time_utilities import TimeUtilities
 from djongo.models.fields import ObjectId
 from datetime import datetime
+from ..products.models import Products
+from ..profiles.models import Profiles
 
 
 class Orders(models.Model):
@@ -11,8 +13,10 @@ class Orders(models.Model):
 
     _id = models.ObjectIdField()
 
-    productId = models.TextField()
-    vendorId = models.TextField()
+    product = models.ForeignKey(Products, on_delete=models.CASCADE)
+    print(type(productId))
+    vendorId = models.ForeignKey(Profiles, on_delete=models.CASCADE)
+    print(type(vendorId))
     customerId = models.TextField()
     customerName = models.TextField()
 
