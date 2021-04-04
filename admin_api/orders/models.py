@@ -12,11 +12,8 @@ class Orders(models.Model):
     objects = models.DjongoManager()
 
     _id = models.ObjectIdField()
-
-    product = models.ForeignKey(Products, on_delete=models.CASCADE)
-    print(type(productId))
-    vendorId = models.ForeignKey(Profiles, on_delete=models.CASCADE)
-    print(type(vendorId))
+    product = models.TextField()
+    vendorId = models.TextField()
     customerId = models.TextField()
     customerName = models.TextField()
 

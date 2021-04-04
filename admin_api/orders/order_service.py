@@ -4,7 +4,9 @@ from ..serializers import BsonSerializer
 from .models import Orders
 from ..profiles.models import Profiles
 from ..products.models import Products
+from ..products.product_service import ProductService
 from djongo.models.fields import ObjectId
+#from bson.objectid import ObjectID
 
 
 class OrderService():
@@ -53,6 +55,13 @@ class OrderService():
         return response
 
     def create_order(self, data) -> dict:
+        print(type(data))
+        print(type(data['product']))
+
+        productId=ObjectId(data['product'])
+        productData= ProductService(productId).fetch_product_by_id().product
+
+        data['product']=productData
 
         Orders(**data).save()
 

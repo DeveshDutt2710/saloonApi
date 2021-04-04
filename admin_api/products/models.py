@@ -6,6 +6,7 @@ from djongo.models.fields import ObjectId
 from ..profiles.models import Profiles
 from datetime import datetime
 
+
 class Products(models.Model):
     objects = models.DjongoManager()
 
